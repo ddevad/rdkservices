@@ -738,6 +738,25 @@ namespace WPEFramework {
                                 aPort.getSupportedARCTypes(&types);
                                 LOGINFO("Received IARM_BUS_DSMGR_EVENT_HDMI_IN_HOTPLUG  HDMI_ARC Port, types: %d \n",  types);
 			    }
+                            else {
+                                if (DisplaySettings::_instance->m_hdmiInAudioDeviceConnected == true) {
+                                    DisplaySettings::_instance->m_hdmiInAudioDeviceConnected = false;
+                                    DisplaySettings::_instance->connectedAudioPortUpdated(dsAUDIOPORT_TYPE_HDMI_ARC, hdmiin_hotplug_conn);
+                                    LOGINFO("Received IARM_BUS_DSMGR_EVENT_HDMI_IN_HOTPLUG  HDMI_ARC Port disconnected. Notify UI !!!  \n");
+                                }
+
+                                if(DisplaySettings::_instance->m_arcAudioEnabled == true) {
+                                    aPort.enableARC(dsAUDIOARCSUPPORT_ARC, false);
+                                    DisplaySettings::_instance->m_arcAudioEnabled = false;
+                                    LOGINFO("Received IARM_BUS_DSMGR_EVENT_HDMI_IN_HOTPLUG  HDMI_ARC Port disconnected. Disable ARC/eARC !!!  \n");
+                                }
+
+                                {
+                                   std::lock_guard<std::mutex> lock(DisplaySettings::_instance->m_arcRoutingStateMutex);
+                                   DisplaySettings::_instance->m_currentArcRoutingState = ARC_STATE_ARC_TERMINATED;
+                                }
+
+                            }
 			}
                         catch (const device::Exception& err)
                         {
