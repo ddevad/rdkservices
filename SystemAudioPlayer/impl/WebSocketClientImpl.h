@@ -21,6 +21,10 @@
 
 #include <atomic>
 #include <functional>
+#include <chrono>
+
+#include "../utils/cherryaid.h"
+#include "../utils/tsm48k.h"
 
 #include "AudioPlayer.h"
 #include "logger.h"
@@ -30,7 +34,10 @@
 #include "WebSockets/CommunicationInterface/BinaryInterface.h"
 #include "WebSockets/ConnectionInitializationResult.h"
 
+#define MAX_SIZE_PER_CHANNEL 1024
+#define MAX_NUM_SAMPLES 768
 
+static std::chrono::time_point<std::chrono::steady_clock> g_inittime;
 namespace impl {
 
 template <template <typename, typename> typename Encryption>
@@ -61,6 +68,7 @@ private:
     std::atomic_bool connected_{false};
     AudioPlayer* player_;
     const std::string defaultAudioPort_{"40001"};
+    TSMHandle_t tsmHandle_{NULL};
 };
 
 template <template <typename, typename> typename Encryption>
@@ -96,9 +104,57 @@ void WebSocketClientImpl<Encryption>::disconnect()
 template <template <typename, typename> typename Encryption>
 void WebSocketClientImpl<Encryption>::onMessage(const std::string& msg)
 {
-    const void* in = static_cast<const void*>(msg.c_str());
+    unsigned int samples_out;
+    int16_t leftBuff[MAX_SIZE_PER_CHANNEL] = {0};
+    int16_t rightBuff[MAX_SIZE_PER_CHANNEL] = {0};
+    int16_t tsmleftBuff[MAX_SIZE_PER_CHANNEL] = {0};
+    int16_t tsmrightBuff[MAX_SIZE_PER_CHANNEL] = {0};
+    int16_t outBuff[MAX_SIZE_PER_CHANNEL * 2] = {0};
+    int16_t tsmOutLen = 0;
+    int chbuffiter = 0;
+    int outbuffiter = 0;
+
+    std::chrono::duration<double> elpased = std::chrono::steady_clock::now() - g_inittime;
+//    const int16_t *in = reinterpret_cast<const int16_t *>(msg.c_str());
+    const int16_t *in = static_cast<const int16_t *>(static_cast<const void *>(msg.c_str()));
     size_t len = msg.size();
-    player_->push_data(in, len);
+    size_t samplesPerChannel = len / 4;
+
+    // DD Test
+    //cherryaid_write_wav("/tmp/cherraid_debug.wav", (const char*) in, len);
+    // Split left and right channels for TSM
+    for (int mainiter = 0; mainiter < (samplesPerChannel * 2) ; mainiter = mainiter + 2)
+    {
+        leftBuff[chbuffiter] = in[mainiter];
+        rightBuff[chbuffiter] = in[mainiter + 1];
+        chbuffiter++;
+    }
+
+    cherryaid_new_data_point(samplesPerChannel, elpased.count(), &samples_out);
+    float newSamplingRate = 48000 + (samples_out - samplesPerChannel);
+    SAPLOG_INFO("SamplesIn %u, samples_out %u, newSamplingRate %f", samplesPerChannel, samples_out, newSamplingRate);
+
+    // TSM block
+    const void *out = NULL;
+    if (tsmHandle_)
+    {
+        TSM_COMCAST_setPlayoutSamplingRate(tsmHandle_, newSamplingRate);
+        TSM_COMCAST_filter_16(tsmHandle_, leftBuff, samplesPerChannel, tsmleftBuff, &tsmOutLen);
+        TSM_COMCAST_filter_16(tsmHandle_, rightBuff, samplesPerChannel, tsmrightBuff, &tsmOutLen);
+        for (int iter = 0; iter < /*samplesPerChannel*/tsmOutLen; iter++)
+        {
+            outBuff[outbuffiter++] = /*leftBuff[iter]*/tsmleftBuff[iter];
+            outBuff[outbuffiter++] = /*rightBuff[iter]*/tsmrightBuff[iter];
+        }
+        out = static_cast<const void *>(outBuff);
+    }
+    else
+    {
+        SAPLOG_INFO("CRITICAL Error : TSM not initialized");
+        out = static_cast<const void *>(msg.c_str());
+    }
+
+    player_->push_data(out, /*samplesPerChannel*/tsmOutLen * 4);
 }
 
 template <template <typename, typename> typename Encryption>
@@ -112,6 +168,12 @@ void WebSocketClientImpl<Encryption>::onServiceConnection(WebSockets::Connection
     }
     else
     {
+        g_inittime = std::chrono::steady_clock::now();
+	cherryaid_init();
+	if(!tsmHandle_)
+	{
+            tsmHandle_ = TSM_COMCAST_create(MAX_NUM_SAMPLES, PCM16);
+	}
         SAPLOG_INFO("Websocket Connection Established.");
         connected_ = true;
         player_->wsConnectionStatus(WSStatus::CONNECTED);
@@ -124,6 +186,11 @@ void WebSocketClientImpl<Encryption>::onServiceDisconnected()
     SAPLOG_INFO("Websocket Connection Closed.");
     connected_ = false;
     player_->wsConnectionStatus(WSStatus::DISCONNECTED);
+    if(tsmHandle_)
+    {
+        TSM_COMCAST_delete(tsmHandle_);
+	tsmHandle_ = NULL;
+    }
 }
 
 template <template <typename, typename> typename Encryption>

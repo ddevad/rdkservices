@@ -23,6 +23,8 @@ add_library(${MODULE_NAME} SHARED
         impl/SecuredWebSocketClient.cpp
         impl/UnsecuredWebSocketClient.cpp
         impl/logger.cpp
+        utils/cherryaid.cpp
+        utils/tsm48k.cpp
         ../helpers/WebSockets/WSEndpoint.cpp
         ../helpers/WebSockets/JsonRpc/Request.cpp
         ../helpers/WebSockets/JsonRpc/Response.cpp
@@ -31,6 +33,8 @@ add_library(${MODULE_NAME} SHARED
 set_target_properties(${MODULE_NAME} PROPERTIES
         CXX_STANDARD 11
         CXX_STANDARD_REQUIRED YES)
+
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DDEBUG_OUTPUT")
 
 list(APPEND CMAKE_MODULE_PATH
         "${CMAKE_CURRENT_SOURCE_DIR}/cmake/")
