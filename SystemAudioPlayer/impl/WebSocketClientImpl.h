@@ -21,6 +21,9 @@
 
 #include <atomic>
 #include <functional>
+#include <chrono>
+
+#include "../utils/cherryaid.h"
 
 #include "AudioPlayer.h"
 #include "logger.h"
@@ -30,7 +33,7 @@
 #include "WebSockets/CommunicationInterface/BinaryInterface.h"
 #include "WebSockets/ConnectionInitializationResult.h"
 
-
+static std::chrono::time_point<std::chrono::system_clock> g_inittime;
 namespace impl {
 
 template <template <typename, typename> typename Encryption>
@@ -96,8 +99,11 @@ void WebSocketClientImpl<Encryption>::disconnect()
 template <template <typename, typename> typename Encryption>
 void WebSocketClientImpl<Encryption>::onMessage(const std::string& msg)
 {
+    unsigned int samples_out;
+    std::chrono::duration<double> elpased = std::chrono::system_clock::now() - g_inittime;
     const void* in = static_cast<const void*>(msg.c_str());
     size_t len = msg.size();
+    cherryaid_new_data_point(len/4, elpased.count(), &samples_out);
     player_->push_data(in, len);
 }
 
@@ -112,6 +118,7 @@ void WebSocketClientImpl<Encryption>::onServiceConnection(WebSockets::Connection
     }
     else
     {
+        g_inittime = std::chrono::system_clock::now();
         SAPLOG_INFO("Websocket Connection Established.");
         connected_ = true;
         player_->wsConnectionStatus(WSStatus::CONNECTED);
