@@ -23,7 +23,7 @@ add_library(${MODULE_NAME} SHARED
         impl/SecuredWebSocketClient.cpp
         impl/UnsecuredWebSocketClient.cpp
         impl/logger.cpp
-        utils/cherryaid.c
+        utils/cherryaid.cpp
         ../helpers/WebSockets/WSEndpoint.cpp
         ../helpers/WebSockets/JsonRpc/Request.cpp
         ../helpers/WebSockets/JsonRpc/Response.cpp

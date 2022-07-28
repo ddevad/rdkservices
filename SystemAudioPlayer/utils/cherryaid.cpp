@@ -1,5 +1,6 @@
 /* Cherry Audio Iterative Determinator - CherryAID */
 #include <stdio.h>
+#include "cherryaid.h"
 
 #define DEBUG_OUTPUT
 
