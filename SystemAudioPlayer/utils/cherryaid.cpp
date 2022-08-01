@@ -1,8 +1,28 @@
 /* Cherry Audio Iterative Determinator - CherryAID */
 #include <stdio.h>
+#include <unistd.h>
+#include <sys/syscall.h>
+#include <time.h>
+#include <sys/time.h>
 #include "cherryaid.h"
 
 #define DEBUG_OUTPUT
+
+#define __TIMESTAMP() do { /*YYMMDD-HH:MM:SS:usec*/               \
+            struct tm __tm;                                             \
+            struct timeval __tv;                                        \
+            gettimeofday(&__tv, NULL);                                  \
+            localtime_r(&__tv.tv_sec, &__tm);                           \
+            fprintf(fp, "[tid=%ld]: %02d%02d%02d-%02d:%02d:%02d:%06d ",                 \
+                                                syscall(SYS_gettid), \
+                                                __tm.tm_year+1900-2000,                             \
+                                                __tm.tm_mon+1,                                      \
+                                                __tm.tm_mday,                                       \
+                                                __tm.tm_hour,                                       \
+                                                __tm.tm_min,                                        \
+                                                __tm.tm_sec,                                        \
+                                                (int)__tv.tv_usec);                                      \
+} while(0)
 
 /* Stats */
 unsigned long long acc_samples_in; /* 32bits give ~24hrs of samples before rollover. 64 bits and we never hve to worry*/
@@ -42,7 +62,7 @@ int cherryaid_new_data_point(unsigned int samples_in, double rx_time, unsigned i
     double expected_samples_in;
     double error_factor; /* acc_samples_out + samples_in - expected_rx_samples */
     double required_correction; /* 1 - error_factor/samples_in */
-    double allowed_correction;
+    double allowed_correction = 1.0; /* Only correct when correction is bigger than 1 sample */
     double applied_correction;
     unsigned int corrected_samples_out;
 
@@ -74,15 +94,18 @@ int cherryaid_new_data_point(unsigned int samples_in, double rx_time, unsigned i
     last_rx_time = rx_time;
 
 #ifdef DEBUG_OUTPUT
-    printf("AccExpRx %lf ",expected_samples_in);
-    printf("Rx_time %lf ",rx_time);
-    printf("req_corr %lf ",required_correction);
-    printf("ald_corr %lf ",allowed_correction);
-    printf("samples_out %d ",*samples_out);
-    printf("acc_samples_out %lld ",acc_samples_out);
-    printf("AccExp-AccRx %lf ", expected_samples_in - (double)acc_samples_in);
-    printf("AccExp-AccSampOut %lf ", expected_samples_in - (double)acc_samples_out);
-    printf("\n");
+    FILE* fp = fopen("/tmp/cherryaid.log", "a");
+    __TIMESTAMP();fprintf(fp, "samples_in %d ",samples_in);
+    fprintf(fp, "acc_samples_in %lld ",acc_samples_in);
+    fprintf(fp, "AccExpRx %lf ",expected_samples_in);
+    fprintf(fp, "Rx_time %lf ",rx_time);
+    fprintf(fp, "req_corr %lf ",required_correction);
+    fprintf(fp, "ald_corr %lf ",allowed_correction);
+    fprintf(fp, "samples_out %d ",*samples_out);
+    fprintf(fp, "acc_samples_out %lld ",acc_samples_out);
+    fprintf(fp, "AccExp-AccRx %lf ", expected_samples_in - (double)acc_samples_in);
+    fprintf(fp, "AccExp-AccSampOut %lf \n", expected_samples_in - (double)acc_samples_out);
+    fclose(fp);
 #endif
 
     
@@ -106,4 +129,14 @@ int cherryaid_get_stats(double *total_time,
     *uncorrected_error_in_samples = *expected_samples_received;
     *corrected_error_in_samples = *expected_samples_received;*/
     return 0;
+}
+
+void cherryaid_write_wav(const char* filename, const char* data, int len) {
+   FILE* fp = fopen(filename, "a");
+   if (!fp) {
+        fprintf(stderr, "Couldn't open the file \"%s\"\n", filename);
+        return;
+    }
+    fwrite(data, len, 1, fp);
+    fclose(fp);
 }
