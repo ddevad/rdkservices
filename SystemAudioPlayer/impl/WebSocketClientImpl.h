@@ -121,7 +121,7 @@ void WebSocketClientImpl<Encryption>::onMessage(const std::string& msg)
     size_t samplesPerChannel = len / 4;
 
     // DD Test
-    cherryaid_write_wav("/tmp/cherraid_debug.wav", (const char*) in, len);
+    //cherryaid_write_wav("/tmp/cherraid_debug.wav", (const char*) in, len);
     // Split left and right channels for TSM
     for (int mainiter = 0; mainiter < (samplesPerChannel * 2) ; mainiter = mainiter + 2)
     {
