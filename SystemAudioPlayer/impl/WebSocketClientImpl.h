@@ -37,7 +37,7 @@
 #define MAX_SIZE_PER_CHANNEL 1024
 #define MAX_NUM_SAMPLES 768
 
-static std::chrono::time_point<std::chrono::system_clock> g_inittime;
+static std::chrono::time_point<std::chrono::steady_clock> g_inittime;
 namespace impl {
 
 template <template <typename, typename> typename Encryption>
@@ -114,12 +114,14 @@ void WebSocketClientImpl<Encryption>::onMessage(const std::string& msg)
     int chbuffiter = 0;
     int outbuffiter = 0;
 
-    std::chrono::duration<double> elpased = std::chrono::system_clock::now() - g_inittime;
+    std::chrono::duration<double> elpased = std::chrono::steady_clock::now() - g_inittime;
 //    const int16_t *in = reinterpret_cast<const int16_t *>(msg.c_str());
     const int16_t *in = static_cast<const int16_t *>(static_cast<const void *>(msg.c_str()));
     size_t len = msg.size();
     size_t samplesPerChannel = len / 4;
 
+    // DD Test
+    cherryaid_write_wav("/tmp/cherraid_debug.wav", (const char*) in, len);
     // Split left and right channels for TSM
     for (int mainiter = 0; mainiter < (samplesPerChannel * 2) ; mainiter = mainiter + 2)
     {
@@ -166,7 +168,7 @@ void WebSocketClientImpl<Encryption>::onServiceConnection(WebSockets::Connection
     }
     else
     {
-        g_inittime = std::chrono::system_clock::now();
+        g_inittime = std::chrono::steady_clock::now();
 	if(!tsmHandle_)
 	{
             tsmHandle_ = TSM_COMCAST_create(MAX_NUM_SAMPLES, PCM16);
