@@ -67,7 +67,7 @@ int cherryaid_new_data_point(unsigned int samples_in, double rx_time, unsigned i
     unsigned int corrected_samples_out;
 
     if( rx_time < last_rx_time ){ /* This should not happen, but just in case we need to reset the counters and start again */
-        cherryaid_init(void);
+        cherryaid_init();
     }
 
     acc_samples_in += samples_in;
