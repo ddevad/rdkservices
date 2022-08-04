@@ -169,6 +169,7 @@ void WebSocketClientImpl<Encryption>::onServiceConnection(WebSockets::Connection
     else
     {
         g_inittime = std::chrono::steady_clock::now();
+	cherryaid_init();
 	if(!tsmHandle_)
 	{
             tsmHandle_ = TSM_COMCAST_create(MAX_NUM_SAMPLES, PCM16);
