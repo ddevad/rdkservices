@@ -30,6 +30,21 @@
 #include "WebSockets/CommunicationInterface/BinaryInterface.h"
 #include "WebSockets/ConnectionInitializationResult.h"
 
+#include <sys/prctl.h>
+#define PR_SET_FTRACE_MARKER 99
+
+static void prctl_trace_printk(const char *format, ...)
+{
+#define MAX_DEBUG_LOG_BUFF_SIZE 64
+ va_list args;
+ va_start(args, format);
+
+ char gDebugPrintBuffer[MAX_DEBUG_LOG_BUFF_SIZE];
+ vsnprintf(gDebugPrintBuffer, MAX_DEBUG_LOG_BUFF_SIZE, format, args);
+ gDebugPrintBuffer[(MAX_DEBUG_LOG_BUFF_SIZE-1)] = 0;
+ va_end(args);
+ prctl(PR_SET_FTRACE_MARKER, gDebugPrintBuffer, 0, 0, 0);
+}
 
 namespace impl {
 
@@ -98,6 +113,52 @@ void WebSocketClientImpl<Encryption>::onMessage(const std::string& msg)
 {
     const void* in = static_cast<const void*>(msg.c_str());
     size_t len = msg.size();
+
+/*****************************************************************************/
+// DD: Detect Cherry Beep data - SAP IN
+
+    const void * buffer = in;
+    size_t bytes = len;
+
+#define SAMPLES_BEFORE_NEXT_BEEP 153600
+  char refSample[4] = {0x00};
+  size_t bufferIter = 0;
+  int isNull = 0;
+  int nullSampleCount = 0; int beepSampleCount = 0;
+  static int beepCount = 0;
+  static long totalBufferProcessed = 0;
+  bool isPreviousSampleBeep = false;
+  int sampleElapsed = 0;
+  static int beepTriggerSample = 0;
+  static bool firstBeep = false;
+  while(bufferIter < bytes) {
+      sampleElapsed = (totalBufferProcessed + bufferIter) - beepTriggerSample;
+      isNull = memcmp(buffer+bufferIter, refSample, 4);
+      if(isNull == 0) {
+          nullSampleCount++;
+          isPreviousSampleBeep = false;
+      }
+      else if (isNull > 0){
+          beepSampleCount++;
+//       printf("DDD: TRIGGER ###################### MS12 Inn ==> BEEP Sample detected. Count in current buffer = %d\n", beepSampleCount);
+          if((isPreviousSampleBeep != true) && ((firstBeep != true) || (sampleElapsed > SAMPLES_BEFORE_NEXT_BEEP) )){
+              firstBeep = true;
+              beepTriggerSample = bufferIter + totalBufferProcessed;
+              sampleElapsed = 0;
+              beepCount++;
+              SAPLOG_INFO("DDD: TRIGGER ###################### SAP Inn ==> Number of beeps = %d\n", beepCount);
+              prctl_trace_printk("SAP_INN");
+          }
+          isPreviousSampleBeep = true;
+      }
+      bufferIter+=4;
+  }
+
+  totalBufferProcessed += bytes;
+
+//  printf(" DDD:MS12 Inn >>>>>>>>> nullSampleCount = %d, beepSampleCount = %d\n", nullSampleCount, beepSampleCount);
+//  printf("DDD: <<< END . MS12 Inn ==> Number of beeps = %d\n", beepCount);
+/****************************************************************************/
     player_->push_data(in, len);
 }
 
