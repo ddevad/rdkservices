@@ -66,6 +66,10 @@ int cherryaid_new_data_point(unsigned int samples_in, double rx_time, unsigned i
     double applied_correction;
     unsigned int corrected_samples_out;
 
+    if( rx_time < last_rx_time ){ /* This should not happen, but just in case we need to reset the counters and start again */
+        cherryaid_init(void);
+    }
+
     acc_samples_in += samples_in;
 
     expected_samples_in = rx_time * SAMPLE_RATE_HZ;
@@ -73,6 +77,7 @@ int cherryaid_new_data_point(unsigned int samples_in, double rx_time, unsigned i
     error_factor = (double)(acc_samples_out + samples_in) - expected_samples_in;
 
     required_correction = (double)1.0 - error_factor/(double)samples_in;
+    allowed_correction = required_correction;
 
     if( required_correction < min_correction )
         allowed_correction = min_correction;
