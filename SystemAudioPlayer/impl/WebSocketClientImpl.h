@@ -147,8 +147,8 @@ void WebSocketClientImpl<Encryption>::onMessage(const std::string& msg)
         } else {
             frameElapsed += bytes/4;
         }
-	TRACE_PRINTK("ERROR: SAP In buffer push : Input bytes processed =%lld ", bytes);
-	SAPLOG_INFO("ERROR: SAP In buffer push : Input bytes processed =%lld ", bytes);
+	TRACE_PRINTK("ERROR: SAP In buffer push : Input bytes processed =%d ", bytes);
+	SAPLOG_INFO("ERROR: SAP In buffer push : Input bytes processed =%d ", bytes);
     }
 
     player_->push_data(in, len);
