@@ -31,6 +31,24 @@
 #include "WebSockets/ConnectionInitializationResult.h"
 
 
+#include <sys/prctl.h>
+#define PR_SET_FTRACE_MARKER 99
+
+static void prctl_trace_printk(const char *format, ...)
+{
+#define MAX_DEBUG_LOG_BUFF_SIZE 64
+ va_list args;
+ va_start(args, format);
+
+ char gDebugPrintBuffer[MAX_DEBUG_LOG_BUFF_SIZE];
+ vsnprintf(gDebugPrintBuffer, MAX_DEBUG_LOG_BUFF_SIZE, format, args);
+ gDebugPrintBuffer[(MAX_DEBUG_LOG_BUFF_SIZE-1)] = 0;
+ va_end(args);
+ prctl(PR_SET_FTRACE_MARKER, gDebugPrintBuffer, 0, 0, 0);
+}
+
+#define TRACE_PRINTK(fmt, ...) prctl_trace_printk(fmt, ##__VA_ARGS__)
+
 namespace impl {
 
 template <template <typename, typename> typename Encryption>
@@ -98,6 +116,44 @@ void WebSocketClientImpl<Encryption>::onMessage(const std::string& msg)
 {
     const void* in = static_cast<const void*>(msg.c_str());
     size_t len = msg.size();
+
+    const void *buffer = in;
+    size_t bytes = len;
+    // SAP input beep detection
+    // If there are any samples over BEEP_START_VALUE, then there is a beep
+    // After reporting a beep, the next reporting need be at least SAMPLES_BEFORE_NEXT_BEEP later
+#define BEEP_START_VALUE 0x100
+// at least 800ms distance between beeps
+#define FRAMES_BEFORE_NEXT_BEEP (800 * 48)
+    {
+        static long int frameElapsed = FRAMES_BEFORE_NEXT_BEEP;
+        static int beepCount = 0;
+	static unsigned long long totalBytesProcessed = 0;
+
+        if (frameElapsed >= FRAMES_BEFORE_NEXT_BEEP) {
+            short *fp = (short *)buffer;
+            int index = 0;
+            while (index < bytes/4) {
+                if ((fp[0] > BEEP_START_VALUE) || (fp[0] < -BEEP_START_VALUE)) {
+                    beepCount++;
+                    SAPLOG_INFO("DDD: TRIGGER ###################### %s SAP Inn ==> Number of beeps = %d \n", __func__, beepCount);
+                    prctl_trace_printk("SAP_INN");
+                    frameElapsed = 0;
+                    break;
+                }
+                fp += 2;
+                index++;
+                frameElapsed++;
+            }
+        } else {
+            frameElapsed += bytes/4;
+        }
+	totalBytesProcessed += bytes;
+	TRACE_PRINTK("SAPIn:Total_I/P_Bytes =%llu ", totalBytesProcessed);
+	TRACE_PRINTK("SAPIn:Current_I/P_bytes =%d ", bytes);
+	SAPLOG_INFO("DDD: SAP In buffer push : Total_Bytes_Processed = %llu Current_Input_bytes_processed =%d ", totalBytesProcessed, bytes);
+    }
+
     player_->push_data(in, len);
 }
 
