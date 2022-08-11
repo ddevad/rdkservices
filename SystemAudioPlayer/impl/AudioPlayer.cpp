@@ -252,7 +252,7 @@ void AudioPlayer::createPipeline(bool smartVolumeEnable)
             SAPLOG_INFO("Unable to add audio caps for PCM audio.\n");
             return;
         }
-#if 0
+
         if(playMode == SYSTEM)
 	{
 	    #if defined(PLATFORM_AMLOGIC)
@@ -260,7 +260,6 @@ void AudioPlayer::createPipeline(bool smartVolumeEnable)
             #endif
 	}
 	else
-#endif
 	{
 	    //PlayMode ->Apps....for TTS playback
 	    #if defined(PLATFORM_AMLOGIC)
