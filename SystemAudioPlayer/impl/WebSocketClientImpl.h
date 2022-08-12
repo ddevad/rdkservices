@@ -128,7 +128,7 @@ void WebSocketClientImpl<Encryption>::onMessage(const std::string& msg)
     {
         static long int frameElapsed = FRAMES_BEFORE_NEXT_BEEP;
         static int beepCount = 0;
-	unsigned long long totalBytesProcessed = 0;
+	static unsigned long long totalBytesProcessed = 0;
 
         if (frameElapsed >= FRAMES_BEFORE_NEXT_BEEP) {
             short *fp = (short *)buffer;
@@ -149,7 +149,8 @@ void WebSocketClientImpl<Encryption>::onMessage(const std::string& msg)
             frameElapsed += bytes/4;
         }
 	totalBytesProcessed += bytes;
-	TRACE_PRINTK("DDD: SAP In buffer push : Total_Bytes_Processed = %llu Current_Input_bytes_processed =%d ", totalBytesProcessed, bytes);
+	TRACE_PRINTK("DDD:SAP In: Total_Bytes_Processed =%llu ", totalBytesProcessed);
+	TRACE_PRINTK("DDD:SAP In: Current_Input_bytes_processed =%d ", bytes);
 	SAPLOG_INFO("DDD: SAP In buffer push : Total_Bytes_Processed = %llu Current_Input_bytes_processed =%d ", totalBytesProcessed, bytes);
     }
 
