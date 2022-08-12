@@ -149,8 +149,8 @@ void WebSocketClientImpl<Encryption>::onMessage(const std::string& msg)
             frameElapsed += bytes/4;
         }
 	totalBytesProcessed += bytes;
-	TRACE_PRINTK("DDD:SAP In: Total_Bytes_Processed =%llu ", totalBytesProcessed);
-	TRACE_PRINTK("DDD:SAP In: Current_Input_bytes_processed =%d ", bytes);
+	TRACE_PRINTK("SAPIn:Total_I/P_Bytes =%llu ", totalBytesProcessed);
+	TRACE_PRINTK("SAPIn:Current_I/P_bytes =%d ", bytes);
 	SAPLOG_INFO("DDD: SAP In buffer push : Total_Bytes_Processed = %llu Current_Input_bytes_processed =%d ", totalBytesProcessed, bytes);
     }
 
