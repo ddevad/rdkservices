@@ -205,7 +205,7 @@ void AudioPlayer::createPipeline(bool smartVolumeEnable)
     }
      // create soc specific elements..generic elements
     GstElement *convert = gst_element_factory_make("audioconvert", NULL);
-    GstElement *resample = gst_element_factory_make("audioresample", NULL);
+    //GstElement *resample = gst_element_factory_make("audioresample", NULL);
 #if defined(PLATFORM_AMLOGIC)
     m_audioSink = gst_element_factory_make("amlhalasink", NULL);
     m_audioVolume = m_audioSink;
@@ -252,7 +252,7 @@ void AudioPlayer::createPipeline(bool smartVolumeEnable)
             SAPLOG_INFO("Unable to add audio caps for PCM audio.\n");
             return;
         }
-
+    
         if(playMode == SYSTEM)
 	{
 	    #if defined(PLATFORM_AMLOGIC)
@@ -264,7 +264,6 @@ void AudioPlayer::createPipeline(bool smartVolumeEnable)
 	    //PlayMode ->Apps....for TTS playback
 	    #if defined(PLATFORM_AMLOGIC)
             g_object_set(G_OBJECT(m_audioSink), "tts-mode", TRUE, NULL);
-	    SAPLOG_INFO("Enforce tts mode\n");
             #endif
 	}
 
@@ -278,18 +277,24 @@ void AudioPlayer::createPipeline(bool smartVolumeEnable)
 	    #if defined(PLATFORM_AMLOGIC)
             if(smartVolumeEnable)
             {
-               gst_bin_add_many(GST_BIN(m_pipeline), m_source, m_audioCutter, convert, resample, m_audioSink, NULL);
-               result = gst_element_link_many (m_source,m_audioCutter,convert,resample,m_audioSink,NULL);
+               //gst_bin_add_many(GST_BIN(m_pipeline), m_source, m_audioCutter, convert, resample, m_audioSink, NULL);
+               //result = gst_element_link_many (m_source,m_audioCutter,convert,resample,m_audioSink,NULL);
+               gst_bin_add_many(GST_BIN(m_pipeline), m_source, m_audioCutter, convert, m_audioSink, NULL);
+               result = gst_element_link_many (m_source,m_audioCutter,convert,m_audioSink,NULL);
             }
             else
             {
-               gst_bin_add_many(GST_BIN(m_pipeline), m_source, convert, resample, m_audioSink, NULL);
-               result = gst_element_link_many (m_source,convert,resample,m_audioSink,NULL);
+               //gst_bin_add_many(GST_BIN(m_pipeline), m_source, convert, resample, m_audioSink, NULL);
+               //result = gst_element_link_many (m_source,convert,resample,m_audioSink,NULL);
+               gst_bin_add_many(GST_BIN(m_pipeline), m_source, convert, m_audioSink, NULL);
+               result = gst_element_link_many (m_source,convert,m_audioSink,NULL);	       
             }
             #elif defined(PLATFORM_REALTEK)
             g_object_set(G_OBJECT(m_audioSink), "async",  FALSE, NULL);
-            gst_bin_add_many(GST_BIN(m_pipeline), m_source, convert, resample, audiofilter, m_audioSink,m_audioVolume,NULL);
-            result = gst_element_link_many (m_source,convert,resample,audiofilter,m_audioVolume,m_audioSink,NULL);
+            //gst_bin_add_many(GST_BIN(m_pipeline), m_source, convert, resample, audiofilter, m_audioSink,m_audioVolume,NULL);
+            //result = gst_element_link_many (m_source,convert,resample,audiofilter,m_audioVolume,m_audioSink,NULL);
+	    gst_bin_add_many(GST_BIN(m_pipeline), m_source, convert, audiofilter, m_audioSink,m_audioVolume,NULL);
+	    result = gst_element_link_many (m_source,convert,audiofilter,m_audioVolume,m_audioSink,NULL);
 	    #else
             gst_bin_add_many(GST_BIN(m_pipeline), m_source, m_audioSink, NULL);
             result = gst_element_link_many (m_source,m_audioSink,NULL);
@@ -312,17 +317,24 @@ void AudioPlayer::createPipeline(bool smartVolumeEnable)
             #if defined(PLATFORM_AMLOGIC)
             if(smartVolumeEnable)
             {
-               gst_bin_add_many(GST_BIN(m_pipeline), m_source, m_capsfilter, m_audioCutter, convert, resample, m_audioSink, NULL);
-               result = gst_element_link_many (m_source,m_capsfilter,m_audioCutter,convert,resample,m_audioSink,NULL);
+               //gst_bin_add_many(GST_BIN(m_pipeline), m_source, m_capsfilter, m_audioCutter, convert, resample, m_audioSink, NULL);
+               //result = gst_element_link_many (m_source,m_capsfilter,m_audioCutter,convert,resample,m_audioSink,NULL);
+               gst_bin_add_many(GST_BIN(m_pipeline), m_source, m_capsfilter, m_audioCutter, convert, m_audioSink, NULL);
+               result = gst_element_link_many (m_source,m_capsfilter,m_audioCutter,convert,m_audioSink,NULL);
             }
             else
             {
-               gst_bin_add_many(GST_BIN(m_pipeline), m_source, m_capsfilter, convert, resample, m_audioSink, NULL);
-               result = gst_element_link_many (m_source,m_capsfilter,convert,resample,m_audioSink,NULL);
+               //gst_bin_add_many(GST_BIN(m_pipeline), m_source, m_capsfilter, convert, resample, m_audioSink, NULL);
+               //result = gst_element_link_many (m_source,m_capsfilter,convert,resample,m_audioSink,NULL);
+	       SAPLOG_INFO("DDD:  SAP: Pipeline configured without resampler\n");
+               gst_bin_add_many(GST_BIN(m_pipeline), m_source, m_capsfilter, convert, m_audioSink, NULL);
+               result = gst_element_link_many (m_source,m_capsfilter,convert,m_audioSink,NULL);	       
             }
             #elif defined(PLATFORM_REALTEK)
-            gst_bin_add_many(GST_BIN(m_pipeline), m_source, m_capsfilter, convert, resample,audiofilter,m_audioVolume,m_audioSink, NULL);
-            result = gst_element_link_many (m_source,m_capsfilter,convert,resample,audiofilter,m_audioVolume,m_audioSink,NULL);
+            //gst_bin_add_many(GST_BIN(m_pipeline), m_source, m_capsfilter, convert, resample,audiofilter,m_audioVolume,m_audioSink, NULL);
+            //result = gst_element_link_many (m_source,m_capsfilter,convert,resample,audiofilter,m_audioVolume,m_audioSink,NULL);
+            gst_bin_add_many(GST_BIN(m_pipeline), m_source, m_capsfilter, convert, audiofilter,m_audioVolume,m_audioSink, NULL);
+            result = gst_element_link_many (m_source,m_capsfilter,convert,audiofilter,m_audioVolume,m_audioSink,NULL);
             #else
 	    gst_bin_add_many(GST_BIN(m_pipeline), m_source, m_capsfilter, m_audioSink, NULL);
 	    result = gst_element_link_many (m_source,m_capsfilter,m_audioSink,NULL);
@@ -350,17 +362,23 @@ void AudioPlayer::createPipeline(bool smartVolumeEnable)
         #if defined(PLATFORM_AMLOGIC)
         if(smartVolumeEnable)
         {
-           gst_bin_add_many(GST_BIN(m_pipeline), m_source, wavparser, m_audioCutter, convert, resample, m_audioSink, NULL);
-           result = gst_element_link_many (m_source,wavparser,m_audioCutter,convert,resample,m_audioSink,NULL);
+           //gst_bin_add_many(GST_BIN(m_pipeline), m_source, wavparser, m_audioCutter, convert, resample, m_audioSink, NULL);
+           //result = gst_element_link_many (m_source,wavparser,m_audioCutter,convert,resample,m_audioSink,NULL);
+           gst_bin_add_many(GST_BIN(m_pipeline), m_source, wavparser, m_audioCutter, convert, m_audioSink, NULL);
+           result = gst_element_link_many (m_source,wavparser,m_audioCutter,convert,m_audioSink,NULL);
         }
         else
         {
-           gst_bin_add_many(GST_BIN(m_pipeline), m_source, wavparser, convert, resample, m_audioSink, NULL);
-           result = gst_element_link_many (m_source,wavparser,convert,resample,m_audioSink,NULL);
+           //gst_bin_add_many(GST_BIN(m_pipeline), m_source, wavparser, convert, resample, m_audioSink, NULL);
+           //result = gst_element_link_many (m_source,wavparser,convert,resample,m_audioSink,NULL);
+           gst_bin_add_many(GST_BIN(m_pipeline), m_source, wavparser, m_audioCutter, convert, m_audioSink, NULL);
+           result = gst_element_link_many (m_source,wavparser,m_audioCutter,convert,m_audioSink,NULL);
         }
         #elif defined(PLATFORM_REALTEK)
-        gst_bin_add_many(GST_BIN(m_pipeline), m_source, wavparser, convert, resample,audiofilter,m_audioVolume,m_audioSink, NULL);
-        result = gst_element_link_many (m_source,wavparser,convert,resample,audiofilter,m_audioVolume,m_audioSink,NULL);
+        //gst_bin_add_many(GST_BIN(m_pipeline), m_source, wavparser, convert, resample,audiofilter,m_audioVolume,m_audioSink, NULL);
+        //result = gst_element_link_many (m_source,wavparser,convert,resample,audiofilter,m_audioVolume,m_audioSink,NULL);
+        gst_bin_add_many(GST_BIN(m_pipeline), m_source, wavparser, convert, audiofilter,m_audioVolume,m_audioSink, NULL);
+        result = gst_element_link_many (m_source,wavparser,convert,audiofilter,m_audioVolume,m_audioSink,NULL);	
         #endif
     }
 
@@ -378,7 +396,8 @@ void AudioPlayer::createPipeline(bool smartVolumeEnable)
         GstElement *parser = gst_element_factory_make("mpegaudioparse", NULL);
         #if defined(PLATFORM_AMLOGIC)
         GstElement *decodebin = gst_element_factory_make("avdec_mp3", NULL);
-	gst_bin_add_many(GST_BIN(m_pipeline), m_source, parser, decodebin, convert, resample, m_audioSink, NULL);
+	//gst_bin_add_many(GST_BIN(m_pipeline), m_source, parser, decodebin, convert, resample, m_audioSink, NULL);
+	gst_bin_add_many(GST_BIN(m_pipeline), m_source, parser, decodebin, convert,  m_audioSink, NULL);
         result &= gst_element_link (m_source, parser);
         result &= gst_element_link (parser, decodebin);
         if(smartVolumeEnable)
@@ -390,12 +409,15 @@ void AudioPlayer::createPipeline(bool smartVolumeEnable)
         {
            result &= gst_element_link (decodebin, convert);
         }
-        result &= gst_element_link (convert, resample);
-        result &= gst_element_link (resample, m_audioSink);
+        //result &= gst_element_link (convert, resample);
+        //result &= gst_element_link (resample, m_audioSink);
+	result &= gst_element_link (convert, m_audioSink);
         #elif defined(PLATFORM_REALTEK)
         GstElement *decodebin = gst_element_factory_make("avdec_mp3", NULL);
-        gst_bin_add_many(GST_BIN(m_pipeline), m_source, parser, convert, resample, audiofilter, decodebin, m_audioSink, m_audioVolume, NULL);
-        gst_element_link_many (m_source, parser, decodebin, convert, resample, audiofilter, m_audioVolume, m_audioSink, NULL);
+//        gst_bin_add_many(GST_BIN(m_pipeline), m_source, parser, convert, resample, audiofilter, decodebin, m_audioSink, m_audioVolume, NULL);
+//        gst_element_link_many (m_source, parser, decodebin, convert, resample, audiofilter, m_audioVolume, m_audioSink, NULL);
+        gst_bin_add_many(GST_BIN(m_pipeline), m_source, parser, convert, audiofilter, decodebin, m_audioSink, m_audioVolume, NULL);
+        gst_element_link_many (m_source, parser, decodebin, convert, audiofilter, m_audioVolume, m_audioSink, NULL);
         #endif
     }
 
