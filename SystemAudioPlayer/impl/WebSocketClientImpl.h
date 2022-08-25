@@ -49,6 +49,42 @@ static void prctl_trace_printk(const char *format, ...)
 
 #define TRACE_PRINTK(fmt, ...) prctl_trace_printk(fmt, ##__VA_ARGS__)
 
+static int gpio_set_sysfs_str(const char *path, const char *val)
+{
+    int fd;
+    int bytes;
+    fd = open(path, O_WRONLY);
+    if (fd >= 0) {
+        bytes = write(fd, val, strlen(val));
+        close(fd);
+        return 0;
+    } else {
+        SAPLOG_INFO("unable to open file %s,err: %s", path, strerror(errno));
+    }
+    return -1;
+}
+
+static int beepTestGPIOTrigger(bool enable) {
+    static bool gpioConfigured =  false;
+    if(gpioConfigured != true) {
+        gpio_set_sysfs_str("/sys/class/gpio/export", "459");
+        gpio_set_sysfs_str("/sys/class/gpio/gpio459/direction", "out");
+        gpio_set_sysfs_str("/sys/class/gpio/gpio459/value", "0");
+        gpioConfigured = true;
+    }
+
+    if(enable) {
+        gpio_set_sysfs_str("/sys/class/gpio/gpio459/value", "1");
+        SAPLOG_INFO("%s: DDD ########## GPIO 459 1 \n", __FUNCTION__);
+    }
+    else {
+        gpio_set_sysfs_str("/sys/class/gpio/gpio459/value", "0");
+        SAPLOG_INFO("%s: DDD ########## GPIO 459 0 \n", __FUNCTION__);
+    }
+
+    return 0;
+}
+
 namespace impl {
 
 template <template <typename, typename> typename Encryption>
@@ -125,10 +161,17 @@ void WebSocketClientImpl<Encryption>::onMessage(const std::string& msg)
 #define BEEP_START_VALUE 0x100
 // at least 800ms distance between beeps
 #define FRAMES_BEFORE_NEXT_BEEP (800 * 48)
+#define FRAMES_BEFORE_BEEP_OFF (200 * 48)
     {
         static long int frameElapsed = FRAMES_BEFORE_NEXT_BEEP;
         static int beepCount = 0;
+        static bool beepON = false;
 	static unsigned long long totalBytesProcessed = 0;
+
+        if ( (frameElapsed >= FRAMES_BEFORE_BEEP_OFF) && (beepON == true)) {
+            beepTestGPIOTrigger(false);
+            beepON = false;
+        }
 
         if (frameElapsed >= FRAMES_BEFORE_NEXT_BEEP) {
             short *fp = (short *)buffer;
@@ -138,6 +181,8 @@ void WebSocketClientImpl<Encryption>::onMessage(const std::string& msg)
                     beepCount++;
                     SAPLOG_INFO("DDD: TRIGGER ###################### %s SAP Inn ==> Number of beeps = %d \n", __func__, beepCount);
                     prctl_trace_printk("SAP_INN");
+                    beepTestGPIOTrigger(true);
+                    beepON = true;
                     frameElapsed = 0;
                     break;
                 }
@@ -149,8 +194,8 @@ void WebSocketClientImpl<Encryption>::onMessage(const std::string& msg)
             frameElapsed += bytes/4;
         }
 	totalBytesProcessed += bytes;
-	TRACE_PRINTK("SAPIn:Total_I/P_Bytes =%llu ", totalBytesProcessed);
-	TRACE_PRINTK("SAPIn:Current_I/P_bytes =%d ", bytes);
+        TRACE_PRINTK("SAPIn:Total_I/P_Bytes =%llu ", totalBytesProcessed);
+        TRACE_PRINTK("SAPIn:Current_I/P_bytes =%d ", bytes);
 	SAPLOG_INFO("DDD: SAP In buffer push : Total_Bytes_Processed = %llu Current_Input_bytes_processed =%d ", totalBytesProcessed, bytes);
     }
 
