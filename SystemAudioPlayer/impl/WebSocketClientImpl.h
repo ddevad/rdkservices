@@ -49,6 +49,10 @@ static void prctl_trace_printk(const char *format, ...)
 
 #define TRACE_PRINTK(fmt, ...) prctl_trace_printk(fmt, ##__VA_ARGS__)
 
+#define MIN_GAP_BETWEEN_PKTS_IN_MS	17
+#define DISCONTINUITY_IN_MS	43
+static std::chrono::time_point<std::chrono::steady_clock> g_inittime;
+
 static int gpio_set_sysfs_str(const char *path, const char *val)
 {
     int fd;
@@ -155,51 +159,81 @@ void WebSocketClientImpl<Encryption>::onMessage(const std::string& msg)
 
     const void *buffer = in;
     size_t bytes = len;
-    // SAP input beep detection
-    // If there are any samples over BEEP_START_VALUE, then there is a beep
-    // After reporting a beep, the next reporting need be at least SAMPLES_BEFORE_NEXT_BEEP later
-#define BEEP_START_VALUE 0x100
-// at least 800ms distance between beeps
-#define FRAMES_BEFORE_NEXT_BEEP (800 * 48)
-#define FRAMES_BEFORE_BEEP_OFF (200 * 48)
-    {
-        static long int frameElapsed = FRAMES_BEFORE_NEXT_BEEP;
-        static int beepCount = 0;
-        static bool beepON = false;
-	static unsigned long long totalBytesProcessed = 0;
+    std::chrono::duration<double> elapsed = std::chrono::steady_clock::now() - g_inittime;
 
-        if ( (frameElapsed >= FRAMES_BEFORE_BEEP_OFF) && (beepON == true)) {
-            beepTestGPIOTrigger(false);
-            beepON = false;
-        }
-
-        if (frameElapsed >= FRAMES_BEFORE_NEXT_BEEP) {
-            short *fp = (short *)buffer;
-            int index = 0;
-            while (index < bytes/4) {
-                if ((fp[0] > BEEP_START_VALUE) || (fp[0] < -BEEP_START_VALUE)) {
-                    beepCount++;
-                    SAPLOG_INFO("DDD: TRIGGER ###################### %s SAP Inn ==> Number of beeps = %d \n", __func__, beepCount);
-                    prctl_trace_printk("SAP_INN");
-                    beepTestGPIOTrigger(true);
-                    beepON = true;
-                    frameElapsed = 0;
-                    break;
-                }
-                fp += 2;
-                index++;
-                frameElapsed++;
-            }
-        } else {
-            frameElapsed += bytes/4;
-        }
-	totalBytesProcessed += bytes;
-        TRACE_PRINTK("SAPIn:Total_I/P_Bytes =%llu ", totalBytesProcessed);
-        TRACE_PRINTK("SAPIn:Current_I/P_bytes =%d ", bytes);
-	SAPLOG_INFO("DDD: SAP In buffer push : Total_Bytes_Processed = %llu Current_Input_bytes_processed =%d ", totalBytesProcessed, bytes);
+    static bool discontinuityDetected = false;
+    /* discontinuity handling section: a discontinuity is defined as a gap between successive packets of DISCONTINUITY_ms. When a discontinuity is detected, the packet is discarded, and all subsequent packets
+     * that arrive with 17ms of that last packet are discarded.
+     * Normally packets should arrive every 21.333ms, and jitter at cherry side is +/-4ms
+     */
+    if (discontinuityDetected) {
+    	if (((elapsed.count() * 1000) < MIN_GAP_BETWEEN_PKTS_IN_MS) || ((elapsed.count() * 1000) > DISCONTINUITY_IN_MS)) {
+    		TRACE_PRINTK("ERROR: WebSocketClientImpl, discontinuity recovery, gap from last pkt=%.6f ms ", (elapsed.count() * 1000));
+                SAPLOG_INFO("ERROR: WebSocketClientImpl, discontinuity recovery, gap from last pkt=%.6f ms \n", (elapsed.count() * 1000));
+    	} else {
+    		/* discontinuity recovery has completed */
+    		discontinuityDetected = false;
+    		TRACE_PRINTK("WebSocketClientImpl: discontinuity recovery now complete");
+                SAPLOG_INFO("WebSocketClientImpl: discontinuity recovery now complete");
+    	}
+    } else if ((elapsed.count() * 1000) > DISCONTINUITY_IN_MS) {
+    	TRACE_PRINTK("ERROR: WebSocketClientImpl, discontinuity detected, gap from last pkt=%.6f ms ", (elapsed.count() * 1000));
+        SAPLOG_INFO("ERROR: WebSocketClientImpl, discontinuity detected, gap from last pkt=%.6f ms\n ", (elapsed.count() * 1000));
+    	discontinuityDetected = true;
     }
-
-    player_->push_data(in, len);
+    /* update last time value */
+    g_inittime = std::chrono::steady_clock::now();
+    /* check if in discontinuity */
+    if (discontinuityDetected == false) {
+        // SAP input beep detection
+        // If there are any samples over BEEP_START_VALUE, then there is a beep
+        // After reporting a beep, the next reporting need be at least SAMPLES_BEFORE_NEXT_BEEP later
+    #define BEEP_START_VALUE 0x100
+    // at least 800ms distance between beeps
+    #define FRAMES_BEFORE_NEXT_BEEP (800 * 48)
+    #define FRAMES_BEFORE_BEEP_OFF (200 * 48)
+        {
+            static long int frameElapsed = FRAMES_BEFORE_NEXT_BEEP;
+            static int beepCount = 0;
+            static bool beepON = false;
+            static unsigned long long totalBytesProcessed = 0;
+    
+            if ( (frameElapsed >= FRAMES_BEFORE_BEEP_OFF) && (beepON == true)) {
+                beepTestGPIOTrigger(false);
+                beepON = false;
+            }
+    
+            if (frameElapsed >= FRAMES_BEFORE_NEXT_BEEP) {
+                short *fp = (short *)buffer;
+                int index = 0;
+                while (index < bytes/4) {
+                    if ((fp[0] > BEEP_START_VALUE) || (fp[0] < -BEEP_START_VALUE)) {
+                        beepCount++;
+                        SAPLOG_INFO("DDD: TRIGGER ###################### %s SAP Inn ==> Number of beeps = %d \n", __func__, beepCount);
+                        prctl_trace_printk("SAP_INN");
+                        beepTestGPIOTrigger(true);
+                        beepON = true;
+                        frameElapsed = 0;
+                        break;
+                    }
+                    fp += 2;
+                    index++;
+                    frameElapsed++;
+                }
+            } else {
+                frameElapsed += bytes/4;
+            }
+            totalBytesProcessed += bytes;
+            TRACE_PRINTK("SAPIn:Total_I/P_Bytes =%llu ", totalBytesProcessed);
+            TRACE_PRINTK("SAPIn:Current_I/P_bytes =%d ", bytes);
+            SAPLOG_INFO("DDD: SAP In buffer push : Total_Bytes_Processed = %llu Current_Input_bytes_processed =%d ", totalBytesProcessed, bytes);
+        }
+    
+        player_->push_data(in, len);
+    }
+    else {
+        SAPLOG_INFO("DDD: Network jitter detected. ###################### Drop buffers !!! \n");
+    }
 }
 
 template <template <typename, typename> typename Encryption>
@@ -213,6 +247,7 @@ void WebSocketClientImpl<Encryption>::onServiceConnection(WebSockets::Connection
     }
     else
     {
+        g_inittime = std::chrono::steady_clock::now();
         SAPLOG_INFO("Websocket Connection Established.");
         connected_ = true;
         player_->wsConnectionStatus(WSStatus::CONNECTED);
