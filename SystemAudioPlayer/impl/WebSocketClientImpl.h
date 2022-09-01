@@ -30,6 +30,11 @@
 #include "WebSockets/CommunicationInterface/BinaryInterface.h"
 #include "WebSockets/ConnectionInitializationResult.h"
 
+#define ENABLE_TIMESTAMP_DETECTION 1
+#if ENABLE_TIMESTAMP_DETECTION
+#include <endian.h>
+#include <inttypes.h>
+#endif
 
 #include <sys/prctl.h>
 #define PR_SET_FTRACE_MARKER 99
@@ -161,6 +166,15 @@ void WebSocketClientImpl<Encryption>::onMessage(const std::string& msg)
     size_t bytes = len;
     std::chrono::duration<double> elapsed = std::chrono::steady_clock::now() - g_inittime;
 
+#if ENABLE_TIMESTAMP_DETECTION
+    uint64_t *buf = (uint64_t *)buffer;
+    uint64_t pktCount = be64toh(buf[0]);
+    uint64_t timestamp = be64toh(buf[1]);
+    buffer = buffer + 16;
+    len -= 16;
+    bytes = len;
+#endif
+
     static bool discontinuityDetected = false;
     /* discontinuity handling section: a discontinuity is defined as a gap between successive packets of DISCONTINUITY_ms. When a discontinuity is detected, the packet is discarded, and all subsequent packets
      * that arrive with 17ms of that last packet are discarded.
@@ -168,8 +182,13 @@ void WebSocketClientImpl<Encryption>::onMessage(const std::string& msg)
      */
     if (discontinuityDetected) {
     	if (((elapsed.count() * 1000) < MIN_GAP_BETWEEN_PKTS_IN_MS) || ((elapsed.count() * 1000) > DISCONTINUITY_IN_MS)) {
+#if ENABLE_TIMESTAMP_DETECTION
+		TRACE_PRINTK("ERROR: WebSocketClientImpl, discontinuity recovery, gap from last pkt=%.6f ms, discarding pkt=%" PRIu64 " @ time= %" PRIu64 " nsecs", (elapsed.count() * 1000), pktCount, timestamp);
+		SAPLOG_INFO("ERROR: WebSocketClientImpl, discontinuity recovery, gap from last pkt=%.6f ms, discarding pkt=%" PRIu64 " @ time= %" PRIu64 " nsecs", (elapsed.count() * 1000), pktCount, timestamp);
+#else
     		TRACE_PRINTK("ERROR: WebSocketClientImpl, discontinuity recovery, gap from last pkt=%.6f ms ", (elapsed.count() * 1000));
                 SAPLOG_INFO("ERROR: WebSocketClientImpl, discontinuity recovery, gap from last pkt=%.6f ms \n", (elapsed.count() * 1000));
+#endif
     	} else {
     		/* discontinuity recovery has completed */
     		discontinuityDetected = false;
@@ -177,8 +196,13 @@ void WebSocketClientImpl<Encryption>::onMessage(const std::string& msg)
                 SAPLOG_INFO("WebSocketClientImpl: discontinuity recovery now complete");
     	}
     } else if ((elapsed.count() * 1000) > DISCONTINUITY_IN_MS) {
+#if ENABLE_TIMESTAMP_DETECTION
+	TRACE_PRINTK("ERROR: WebSocketClientImpl, discontinuity detected, gap from last pkt=%.6f ms, discarding pkt=%" PRIu64 " @ time= %" PRIu64 " nsecs", (elapsed.count() * 1000), pktCount, timestamp);
+	SAPLOG_INFO("ERROR: WebSocketClientImpl, discontinuity detected, gap from last pkt=%.6f ms, discarding pkt=%" PRIu64 " @ time= %" PRIu64 " nsecs", (elapsed.count() * 1000), pktCount, timestamp);
+#else
     	TRACE_PRINTK("ERROR: WebSocketClientImpl, discontinuity detected, gap from last pkt=%.6f ms ", (elapsed.count() * 1000));
         SAPLOG_INFO("ERROR: WebSocketClientImpl, discontinuity detected, gap from last pkt=%.6f ms\n ", (elapsed.count() * 1000));
+#endif
     	discontinuityDetected = true;
     }
     /* update last time value */
@@ -228,8 +252,11 @@ void WebSocketClientImpl<Encryption>::onMessage(const std::string& msg)
             TRACE_PRINTK("SAPIn:Current_I/P_bytes =%d ", bytes);
             SAPLOG_INFO("DDD: SAP In buffer push : Total_Bytes_Processed = %llu Current_Input_bytes_processed =%d ", totalBytesProcessed, bytes);
         }
-    
+#if ENABLE_TIMESTAMP_DETECTION
+	player_->push_data(buffer, len);
+#else
         player_->push_data(in, len);
+#endif
     }
     else {
         SAPLOG_INFO("DDD: Network jitter detected. ###################### Drop buffers !!! \n");
