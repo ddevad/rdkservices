@@ -248,6 +248,11 @@ void WebSocketClientImpl<Encryption>::onMessage(const std::string& msg)
                 frameElapsed += bytes/4;
             }
             totalBytesProcessed += bytes;
+
+#if ENABLE_TIMESTAMP_DETECTION
+            TRACE_PRINTK("WebSocketClientImpl: rx'd pkt= %" PRIu64 " @ time= %" PRIu64 " nsecs, samples= %zd,  frameElapsed= %zd ", pktCount, timestamp, bytes/4, frameElapsed);
+            SAPLOG_INFO("WebSocketClientImpl: rx'd pkt= %" PRIu64 " @ time= %" PRIu64 " nsecs, samples= %zd,  frameElapsed= %zd ", pktCount, timestamp, bytes/4, frameElapsed);
+#endif
             TRACE_PRINTK("SAPIn:Total_I/P_Bytes =%llu ", totalBytesProcessed);
             TRACE_PRINTK("SAPIn:Current_I/P_bytes =%d ", bytes);
             SAPLOG_INFO("DDD: SAP In buffer push : Total_Bytes_Processed = %llu Current_Input_bytes_processed =%d ", totalBytesProcessed, bytes);
