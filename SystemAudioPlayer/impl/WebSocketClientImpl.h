@@ -94,6 +94,16 @@ static int beepTestGPIOTrigger(bool enable) {
     return 0;
 }
 
+static void cherryaid_write_wav(const char* filename, const char* data, int len) {
+   FILE* fp = fopen(filename, "a");
+   if (!fp) {
+        fprintf(stderr, "Couldn't open the file \"%s\"\n", filename);
+        return;
+    }
+    fwrite(data, len, 1, fp);
+    fclose(fp);
+}
+
 namespace impl {
 
 template <template <typename, typename> typename Encryption>
@@ -174,6 +184,9 @@ void WebSocketClientImpl<Encryption>::onMessage(const std::string& msg)
     len -= 16;
     bytes = len;
 #endif
+
+    // DD Test: Enable Dump
+    cherryaid_write_wav("/tmp/cherraid_debug.wav", (const char*) buffer, len);
 
     static bool discontinuityDetected = false;
     /* discontinuity handling section: a discontinuity is defined as a gap between successive packets of DISCONTINUITY_ms. When a discontinuity is detected, the packet is discarded, and all subsequent packets
