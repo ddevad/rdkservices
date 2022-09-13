@@ -221,6 +221,7 @@ void WebSocketClientImpl<Encryption>::onMessage(const std::string& msg)
     /* update last time value */
     g_inittime = std::chrono::steady_clock::now();
 
+    std::string audioClock = player_->getAudioClock();
     TRACE_PRINTK("DDD: WebSocketClientImpl, audio clock value =%s ", audioClock.c_str());
     SAPLOG_INFO("DDD: WebSocketClientImpl, audio clock value =%s \n ", audioClock.c_str());
     /* check if in discontinuity */
