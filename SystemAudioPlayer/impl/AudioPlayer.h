@@ -151,5 +151,6 @@ class AudioPlayer
     bool isPlaying();
     bool configPCMCaps(const std::string format, int rate, int channels, const std::string layout);
     void configWsSecParams(const impl::SecurityParameters& secParams);
+    std::string getAudioClock();
 };
 #endif
