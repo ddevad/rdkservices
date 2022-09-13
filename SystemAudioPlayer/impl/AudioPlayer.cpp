@@ -1123,3 +1123,15 @@ void AudioPlayer::SetSmartVolControl(bool smartVolumeEnable, double threshold, i
     return;
 }
 
+//Get Audio hw_ptr / clock
+std::string AudioPlayer::getAudioClock()
+{
+    SAPLOG_INFO(" Audio Player getAudioClock \n");
+    gchar *strval;
+#ifdef PLATFORM_AMLOGIC
+    g_object_get(G_OBJECT(m_audioSink), "audio-hw-pos-sys-time", &strval, NULL);
+#endif
+    std::string audioClock(strval);
+    g_free (strval);
+    return audioClock;
+}
