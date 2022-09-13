@@ -186,7 +186,7 @@ void WebSocketClientImpl<Encryption>::onMessage(const std::string& msg)
 #endif
 
     // DD Test: Enable Dump
-    cherryaid_write_wav("/tmp/cherraid_debug.wav", (const char*) buffer, len);
+//    cherryaid_write_wav("/tmp/cherraid_debug.wav", (const char*) buffer, len);
 
     static bool discontinuityDetected = false;
     /* discontinuity handling section: a discontinuity is defined as a gap between successive packets of DISCONTINUITY_ms. When a discontinuity is detected, the packet is discarded, and all subsequent packets
@@ -220,6 +220,9 @@ void WebSocketClientImpl<Encryption>::onMessage(const std::string& msg)
     }
     /* update last time value */
     g_inittime = std::chrono::steady_clock::now();
+
+    TRACE_PRINTK("DDD: WebSocketClientImpl, audio clock value =%s ", audioClock.c_str());
+    SAPLOG_INFO("DDD: WebSocketClientImpl, audio clock value =%s \n ", audioClock.c_str());
     /* check if in discontinuity */
     if (discontinuityDetected == false) {
         // SAP input beep detection
