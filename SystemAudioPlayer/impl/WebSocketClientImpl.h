@@ -172,10 +172,10 @@ void WebSocketClientImpl<Encryption>::disconnect()
 template <template <typename, typename> typename Encryption>
 void WebSocketClientImpl<Encryption>::onMessage(const std::string& msg)
 {
-    const void* in = static_cast<const void*>(msg.c_str());
+    const char* in = static_cast<const char*>(msg.c_str());
     size_t len = msg.size();
 
-    const int *buffer = (const int*) in;
+    const char *buffer = in;
     size_t bytes = len;
     std::chrono::duration<double> elapsed = std::chrono::steady_clock::now() - g_inittime;
 
