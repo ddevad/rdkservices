@@ -61,10 +61,10 @@ static std::chrono::time_point<std::chrono::steady_clock> g_inittime;
 static int gpio_set_sysfs_str(const char *path, const char *val)
 {
     int fd;
-    int bytes;
+//    int bytes;
     fd = open(path, O_WRONLY);
     if (fd >= 0) {
-        bytes = write(fd, val, strlen(val));
+        write(fd, val, strlen(val));
         close(fd);
         return 0;
     } else {
@@ -94,6 +94,8 @@ static int beepTestGPIOTrigger(bool enable) {
     return 0;
 }
 
+// DD Test: Enable Dump
+#if 0
 static void cherryaid_write_wav(const char* filename, const char* data, int len) {
    FILE* fp = fopen(filename, "a");
    if (!fp) {
@@ -103,6 +105,7 @@ static void cherryaid_write_wav(const char* filename, const char* data, int len)
     fwrite(data, len, 1, fp);
     fclose(fp);
 }
+#endif
 
 namespace impl {
 
@@ -172,7 +175,7 @@ void WebSocketClientImpl<Encryption>::onMessage(const std::string& msg)
     const void* in = static_cast<const void*>(msg.c_str());
     size_t len = msg.size();
 
-    const void *buffer = in;
+    const int *buffer = (const int*) in;
     size_t bytes = len;
     std::chrono::duration<double> elapsed = std::chrono::steady_clock::now() - g_inittime;
 
@@ -251,7 +254,7 @@ void WebSocketClientImpl<Encryption>::onMessage(const std::string& msg)
     
             if (frameElapsed >= FRAMES_BEFORE_NEXT_BEEP) {
                 short *fp = (short *)buffer;
-                int index = 0;
+                size_t index = 0;
                 while (index < bytes/4) {
                     if ((fp[0] > BEEP_START_VALUE) || (fp[0] < -BEEP_START_VALUE)) {
                         beepCount++;
