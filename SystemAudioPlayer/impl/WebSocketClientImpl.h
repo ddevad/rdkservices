@@ -209,14 +209,19 @@ void WebSocketClientImpl<Encryption>::onMessage(const std::string& msg)
                 SAPLOG_INFO("WebSocketClientImpl: discontinuity recovery now complete");
     	}
     } else if ((elapsed.count() * 1000) > DISCONTINUITY_IN_MS) {
+        if (pktCount == 1) {
+            TRACE_PRINTK("WARNING: WebSocketClientImpl, pkt=%" PRIu64 " @ time= %" PRIu64 " nsecs, ignoring discontinuity for pktCount==1, gap from last pkt=%.6f ms", pktCount, timestamp, (elapsed.count() * 1000));
+        }
+        else {
 #if ENABLE_TIMESTAMP_DETECTION
-	TRACE_PRINTK("ERROR: WebSocketClientImpl, discontinuity detected, gap from last pkt=%.6f ms, discarding pkt=%" PRIu64 " @ time= %" PRIu64 " nsecs", (elapsed.count() * 1000), pktCount, timestamp);
-	SAPLOG_INFO("ERROR: WebSocketClientImpl, discontinuity detected, gap from last pkt=%.6f ms, discarding pkt=%" PRIu64 " @ time= %" PRIu64 " nsecs", (elapsed.count() * 1000), pktCount, timestamp);
+            TRACE_PRINTK("ERROR: WebSocketClientImpl, discontinuity detected, gap from last pkt=%.6f ms, discarding pkt=%" PRIu64 " @ time= %" PRIu64 " nsecs", (elapsed.count() * 1000), pktCount, timestamp);
+            SAPLOG_INFO("ERROR: WebSocketClientImpl, discontinuity detected, gap from last pkt=%.6f ms, discarding pkt=%" PRIu64 " @ time= %" PRIu64 " nsecs", (elapsed.count() * 1000), pktCount, timestamp);
 #else
-    	TRACE_PRINTK("ERROR: WebSocketClientImpl, discontinuity detected, gap from last pkt=%.6f ms ", (elapsed.count() * 1000));
-        SAPLOG_INFO("ERROR: WebSocketClientImpl, discontinuity detected, gap from last pkt=%.6f ms\n ", (elapsed.count() * 1000));
+            TRACE_PRINTK("ERROR: WebSocketClientImpl, discontinuity detected, gap from last pkt=%.6f ms ", (elapsed.count() * 1000));
+            SAPLOG_INFO("ERROR: WebSocketClientImpl, discontinuity detected, gap from last pkt=%.6f ms\n ", (elapsed.count() * 1000));
 #endif
-    	discontinuityDetected = true;
+            discontinuityDetected = true;
+        }
     }
     /* update last time value */
     g_inittime = std::chrono::steady_clock::now();
