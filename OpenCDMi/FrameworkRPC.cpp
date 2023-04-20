@@ -20,6 +20,7 @@
 #include <regex>
 #include <string>
 #include <vector>
+#include <time.h>
 
 #include "Module.h"
 #include "CENCParser.h"
@@ -30,6 +31,98 @@
 #include <interfaces/IContentDecryption.h>
 
 extern "C" {
+
+#define ENABLE_FTRACE_DEBUG 0
+
+#include <sys/prctl.h>
+
+#if ENABLE_FTRACE_DEBUG
+#define PR_SET_FTRACE_MARKER 99
+/* sets max size of string buffer */
+#define FTRACE_BUF_SIZE	1024
+
+static int prctl_trace_printk(const char *fmt, ...)
+{
+	char buf[FTRACE_BUF_SIZE];
+	va_list ap;
+	va_start(ap, fmt);
+	vsnprintf(buf, FTRACE_BUF_SIZE, fmt, ap);
+	va_end(ap);
+	return prctl(PR_SET_FTRACE_MARKER, buf, 0, 0, 0);
+}
+
+#define TRACE_PRINTK(fmt, ...) prctl_trace_printk(fmt, ##__VA_ARGS__)
+#else
+#define TRACE_PRINTK(fmt, ...)
+#endif
+
+float ftrace_timespec_subtract(struct timespec *x, struct timespec *y)
+{
+    float diff;
+
+    /* Perform the carry for the later subtraction by updating y. */
+    if (x->tv_nsec < y->tv_nsec) {
+        long int nsec = (y->tv_nsec - x->tv_nsec) / 1000000000L + 1;
+        y->tv_nsec -= 1000000000L * nsec;
+        y->tv_sec += nsec;
+    }
+    if (x->tv_nsec - y->tv_nsec > 1000000000) {
+        long int nsec = (x->tv_nsec - y->tv_nsec) / 1000000000L;
+        y->tv_nsec += 1000000000L * nsec;
+        y->tv_sec -= nsec;
+    }
+
+    /* Return the difference in seconds as a float */
+    diff = x->tv_sec - y->tv_sec;
+    diff += (float)(x->tv_nsec - y->tv_nsec) / 1000000000.0f;
+    if (x->tv_sec < y->tv_sec)
+        diff = -diff;
+    /* return the diff in ms */
+    return diff*1000;
+}
+
+static int ApplyThreadProFromEnv(const char *env, int defaultPolicy, int defaultPriority)
+{
+    int ret = -1;
+	/* get env settings from file for envName */
+    const char *envVal = getenv(env);
+    if (envVal)
+    {
+        int len, c;
+        int priority = defaultPriority;
+        int policy = defaultPolicy;
+		len= strlen(envVal);
+        if ( (len >= 3) && (envVal[1]==',') )
+        {
+            c = envVal[0];
+			/* parse thread policy value */
+            switch(c)
+            {
+                case 'o':
+                case 'O':
+                    policy = SCHED_OTHER;
+                    break;
+                case 'f':
+                case 'F':
+                    policy = SCHED_FIFO;
+                    break;
+                case 'r':
+                case 'R':
+                    policy = SCHED_RR;
+                    break;
+            }
+			/* get thread priority value */
+            priority = atoi(envVal+2);
+        }
+        if(policy != -1)
+        {
+             struct sched_param param = {0};
+             param.sched_priority = priority;
+             ret = pthread_setschedparam(pthread_self(), policy, &param);
+        }
+    }
+    return ret;
+}
 
 typedef ::CDMi::ISystemFactory* (*GetDRMSystemFunction)();
 }
@@ -269,6 +362,11 @@ namespace Plugin {
                     virtual uint32_t Worker() override
                     {
 
+			char name [16];
+                        snprintf(name, 16, "OCDM_decrypt");
+                        prctl(PR_SET_NAME, name, 0, 0, 0);
+			ApplyThreadProFromEnv("OCDM_DECRYPT_PRIORITY", SCHED_RR, 50);
+
                         while (IsRunning() == true) {
 
                             uint32_t clearContentSize = 0;
@@ -279,7 +377,9 @@ namespace Plugin {
                             if (IsRunning() == true) {
                                 uint8_t keyIdLength = 0;
                                 const uint8_t* keyIdData = KeyId(keyIdLength);
+				struct timespec start, end;
 
+				clock_gettime(CLOCK_REALTIME, &start);
                                 int cr = _mediaKeys->Decrypt(
                                     _sessionKey,
                                     _sessionKeyLength,
@@ -294,6 +394,8 @@ namespace Plugin {
                                     keyIdLength,
                                     keyIdData,
                                     InitWithLast15());
+				clock_gettime(CLOCK_REALTIME, &end);
+				TRACE_PRINTK("OCDM: decrypting buffer=%p, size=%d, keyIdData=%s, cr=%d, runtime=%0.03f ms", Buffer(), BytesWritten(), keyIdData, cr, ftrace_timespec_subtract(&end, &start));
                                 if ((cr == 0) && (clearContentSize != 0)) {
                                     if (clearContentSize != BytesWritten()) {
                                         TRACE(Trace::Information, (_T("Returned clear sample size (%d) differs from encrypted buffer size (%d)"), clearContentSize, BytesWritten()));
