@@ -214,7 +214,9 @@ namespace WPEFramework {
             IARM_Bus_PWRMgr_PowerState_t getSystemPowerState();
 
 	    void getHdmiCecSinkPlugin();
+        void getAVCastPlugin ();
 	    WPEFramework::JSONRPC::LinkType<WPEFramework::Core::JSON::IElement>* m_client;
+        WPEFramework::JSONRPC::LinkType<WPEFramework::Core::JSON::IElement>* m_AVCastClient;
 	    std::vector<std::string> m_clientRegisteredEventNames;
 	    uint32_t subscribeForHdmiCecSinkEvent(const char* eventName);
 	    bool setUpHdmiCecSinkArcRouting (bool arcEnable);
@@ -223,6 +225,7 @@ namespace WPEFramework {
 	    bool sendHdmiCecSinkAudioDevicePowerOn();
 	    bool getHdmiCecSinkCecEnableStatus();
 	    bool getHdmiCecSinkAudioDeviceConnectedStatus();
+        bool sendVolumetoAVCast(int level);
 
 	    void onTimer();
 	    void stopCecTimeAndUnsubscribeEvent();

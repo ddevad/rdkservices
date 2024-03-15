@@ -51,6 +51,7 @@
 #include "UtilsString.h"
 #include "UtilsisValidInt.h"
 #include "dsRpc.h"
+#include"dbgain_table.h"
 
 #include "UtilsSynchroIarm.hpp"
 
@@ -58,6 +59,8 @@ using namespace std;
 
 #define HDMI_HOT_PLUG_EVENT_CONNECTED 0
 
+#define AVCAST_CALLSIGN "org.rdk.AVCast"
+#define AVCAST_CALLSIGN_VER AVCAST_CALLSIGN".1"
 
 #define HDMICECSINK_CALLSIGN "org.rdk.HdmiCecSink"
 #define HDMICECSINK_CALLSIGN_VER HDMICECSINK_CALLSIGN".1"
@@ -2968,6 +2971,7 @@ namespace WPEFramework {
                             JsonObject params;
                             params["volumeLevel"] = (int)level;
                             sendNotify("volumeLevelChanged", params);
+                            sendVolumetoAVCast((int)level);
                         }
                         success= true;
                 }
@@ -4634,6 +4638,70 @@ namespace WPEFramework {
             }
         }
 
+        void DisplaySettings::getAVCastPlugin()
+        {
+            if(m_AVCastClient == nullptr)
+            {
+                string token;
+
+                // TODO: use interfaces and remove token
+                auto security = m_service->QueryInterfaceByCallsign<PluginHost::IAuthenticate>("SecurityAgent");
+                if (security != nullptr) {
+                    string payload = "http://localhost";
+                    if (security->CreateToken(
+                            static_cast<uint16_t>(payload.length()),
+                            reinterpret_cast<const uint8_t*>(payload.c_str()),
+                            token)
+                        == Core::ERROR_NONE) {
+                        std::cout << "DisplaySettings got security token" << std::endl;
+                    } else {
+                        std::cout << "DisplaySettings failed to get security token" << std::endl;
+                    }
+                    security->Release();
+                } else {
+                    std::cout << "No security agent" << std::endl;
+                }
+
+                string query = "token=" + token;
+                Core::SystemInfo::SetEnvironment(_T("THUNDER_ACCESS"), (_T("127.0.0.1:9998")));
+                m_AVCastClient = new WPEFramework::JSONRPC::LinkType<Core::JSON::IElement>(_T(AVCAST_CALLSIGN_VER), (_T(AVCAST_CALLSIGN_VER)), false, query);
+                LOGINFO("DisplaySettings getAVCastPlugin init m_AVCastClient\n");
+            }
+        }
+
+        bool DisplaySettings::sendVolumetoAVCast(int level)
+        {
+	        double dblevel_Gain;
+            LOGINFO("\n SANTOSH>>>DisplaySettings::sendVolumetoAVCast\n");
+            PluginHost::IShell::state state;
+            if ((getServiceState(m_service, AVCAST_CALLSIGN, state) == Core::ERROR_NONE) && (state == PluginHost::IShell::state::ACTIVATED)) {
+                LOGERR("%s is active", AVCAST_CALLSIGN);
+
+                getAVCastPlugin();
+                if (!m_AVCastClient) {
+                    LOGERR("AVCAst Initialisation failed\n");
+                }
+                else {
+                    JsonObject avCastResult;
+                    JsonObject param;
+		            dblevel_Gain = dbGain[level];
+                   // param["setvolumeavc"] = dblevel_Gain;//THis works
+		            param["setvolumeavc"] =  to_string(dblevel_Gain);//dblevel_Gain; Here converting to string as the decimal number is not reachig other end. 
+                    LOGINFO("\n SANTOSH>>>DisplaySettings::sendVolumetoAVCastttttttttttt%d %f \n",level,dblevel_Gain);
+
+                    {
+                        Utils::Synchro::UnlockApiGuard<DisplaySettings> unlockApi;
+                        m_AVCastClient->Invoke<JsonObject, JsonObject>(2000, "setvolume", param, avCastResult);
+                    }
+                }
+            }
+            else {
+                LOGERR("AVCast plugin not ready\n");
+				return false;
+            }
+
+            return true;
+        }
 
         IARM_Bus_PWRMgr_PowerState_t DisplaySettings::getSystemPowerState()
         {
